@@ -4,13 +4,14 @@
 #include <fcntl.h>
 #include <errno.h>
 #include <string.h>
+#include <stdbool.h>
 
 #define MAXNAME 16
 
 ssize_t readchar(int fd, char *dest) {
 	static int count = 0;
 	static char *bufptr, buf[BUFSIZ];
-	if (count <= 0) {
+	if (count <= 0) { /* buffer empty, refill */
 		if ((count = read(fd, buf, BUFSIZ)) < 0) {
 			return -1; /* error */
 		} else if (count == 0) {
@@ -18,9 +19,23 @@ ssize_t readchar(int fd, char *dest) {
 		}
 		bufptr = buf;
 	}
-	count--;
 	*dest = *(bufptr++);
+	count--;
 	return 1; /* success */
+}
+
+ssize_t writechar(int fd, char src, bool flush) {
+	static int count = 0;
+	static char buf[BUFSIZ];
+	buf[count] = src;
+	count++;
+	if (count >= BUFSIZ || flush) { /* buffer full, flush it out */
+		if (write(fd, buf, count) < 0) {
+			return -1; /* error */
+		}
+		count = 0;
+	}
+	return 1;
 }
 
 char ctoi (char c) {
@@ -30,6 +45,47 @@ char ctoi (char c) {
 	} else {
 		return -1;
 	}
+}
+
+char itoc (char i) {
+	if (i >= 0 && i <= 9) {
+		return i + '0';
+	} else {
+		return -1;
+	}
+}
+
+unsigned int digitcount (unsigned int x) {
+	if (x == 0) return 1;	
+	int count = 0, test = 1;
+	while (test <= x) {
+		test *= 10;
+		count++;
+	}
+	return count;
+}
+
+int upow (int base, unsigned int power) {
+	unsigned int i;
+	int value = 1;
+	for (i = 0; i < power; i++) {
+		value *= base;
+	}
+	return value;
+}
+
+char digit (unsigned int x, unsigned int index) {
+	return (x / upow(10, index)) % 10;
+}
+
+ssize_t writeuline (int fd, unsigned int src) {
+	unsigned int digits = digitcount(src), i;
+	char currentdigit;
+	for (i = 0; i < digits; i++) {
+		currentdigit = digit(src, digits - i - 1);
+		writechar(fd, itoc(currentdigit), false);
+	}
+	writechar(fd, '\n', false);
 }
 
 ssize_t readuline (int fd, unsigned int *dest) {
@@ -83,7 +139,6 @@ ssize_t readsline (int fd, void *buf, size_t maxlen) {
 int main (void) {
 	/* character info */
 	int fd;
-	/*printf("Gonna open char info file!\n");*/
 	if ((fd = open("characters", O_RDONLY)) == -1) {
 		perror("open");
 		exit(1);
@@ -93,51 +148,46 @@ int main (void) {
 		perror("readchar");
 		exit(1);
 	}
-	/*printf ("%u characters\n", charcount);*/
-	
 	char charnames[charcount][MAXNAME];
 	unsigned int i;
 	for (i = 0; i < charcount; i++) {
 		readsline(fd, charnames[i], MAXNAME);
-		/*printf("%2u: %s\n", i+1, charnames[i]);*/
 	}
-	
-	/*printf("Closing char info file!\n");*/
 	close(fd);
 
 	/* scores */
 	struct flock fl = {F_WRLCK, SEEK_SET, 0, 0, 0};
 	
 	fl.l_pid = getpid();
-	
-	/*printf("Gonna open file!\n");*/
-	
 	if ((fd = open("scores", O_RDWR)) == -1) {
 		perror("open");
 		exit(1);
 	}
-	
-	/*printf("Trying to get lock...\n");*/
-
 	if (fcntl(fd, F_SETLKW, &fl) == -1) {
 		perror("fcntl");
 		exit(1);
 	}
-
-	printf("Got lock!\n");
+	/*printf("Got lock!\n");*/
 	
 	unsigned int charscores[charcount];
 	for (i = 0; i < charcount; i++) {
 		if (readuline(fd, &(charscores[i])) == -1) {
 			perror ("readchar");
 			exit (1);
-		}/* else {
-			printf ("%2u: %5u\n", i+1, charscores[i]);
-		}*/
+		}
 	}
+	for(i = 0; i < charcount; i++) {
+		charscores[i]++;
+	}
+	lseek(fd, 0, SEEK_SET);
+	ftruncate(fd, 0);
+	for (i = 0; i < charcount; i++) {
+		writeuline(fd, charscores[i]);
+	}
+	writechar(fd, '\n', true);
 	
-	printf("Press <RETURN> to release lock: ");
-	getchar();
+	/*printf("Press <RETURN> to release lock: ");
+	getchar();*/
 	
 	fl.l_type = F_UNLCK;
 	
@@ -146,7 +196,7 @@ int main (void) {
 		exit(1);
 	}
 	
-	printf("Unlocked!\n");
+	/*printf("Unlocked!\n");*/
 	
 	close(fd);
 	
