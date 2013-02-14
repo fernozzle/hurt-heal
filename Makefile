@@ -1,7 +1,10 @@
-all: hurt-heal
+all: hurt-heal.cgi
 
-hurt-heal: hurt-heal.c
-	cc -o $@ -std=gnu99 $<
+hurt-heal.cgi: hurt-heal.o io.o
+	cc -o $@ $^
+
+hurt-heal.o: hurt-heal.c
+	cc -std=gnu99 -c -o $@ $<
 
 clean:
-	rm -f hurt-heal
+	rm -f hurt-heal.cgi *.o
