@@ -1,9 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
-#include "io.h"
 
 #define MAXLEN 1024
+
+int getnum (void) {
+	unsigned int val;
+	if (scanf ("%u.", &val) != 1) {
+		return -1;
+	} else {
+		return val;
+	}
+}
 
 int main (void) {
 	char *lenstr, input[MAXLEN];
@@ -14,10 +21,31 @@ int main (void) {
 		printf("No POST data recieved");
 	} else {
 		len = atoi(lenstr);
-		fgets(input, len+1, stdin);
-		
-		printf("Content-Type: text/plain;charset=us-ascii\n\n");
-		printf("%s", input);
+
+		printf("Content-Type: text/plain;charset=us-ascii\n\n");		
+		unsigned int i;
+		int num;
+		scanf("vote=");
+		unsigned int numhurts = getnum();
+		unsigned int numheals = getnum();
+		unsigned int *hurts = malloc(numhurts * sizeof(unsigned int));
+		unsigned int *heals = malloc(numheals * sizeof(unsigned int));
+		for (i = 0; i < numhurts; i++) {
+			num = getnum();
+			hurts[i] = num;
+		}
+		for (i = 0; i < numheals; i++) {
+			num = getnum();
+			heals[i] = num;
+		}
+		printf ("Hurts:\n");
+		for (i = 0; i < numhurts; i++) {
+			printf("%u\n", hurts[i]);
+		}
+		printf ("\nHeals:\n");
+		for (i = 0; i < numheals; i++) {
+			printf("%u\n", heals[i]);
+		}
 	}
 	return 0;
 }
