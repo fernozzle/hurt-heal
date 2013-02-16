@@ -2,12 +2,16 @@
 #include <stdlib.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <string.h>
 
 
 #define MAXNAMELEN 16
 
+int getnum (void);
+int applyvote (FILE *voteinput, unsigned int scores[]);
 
 int main (void) {
+	printf("Content-Type: text/plain;charset=us-ascii\n\n");
 	/* read character info */
 	int fd;
 	FILE *fp;
@@ -52,15 +56,9 @@ int main (void) {
 	}
 
 	/* change scores */
-	unsigned static int hurtcount = 3;
-	unsigned static int healcount = 2;
-	unsigned int hurtlist[] = {2, 7, 15};
-	unsigned int heallist[] = {3, 30};
-	for(i = 0; i < hurtcount; i++) {
-		charscores[hurtlist[i]]--;
-	}
-	for(i = 0; i < healcount; i++) {
-		charscores[heallist[i]]++;
+	if (applyvote(stdin, charscores) == -1) {
+		printf ("Unexpected vote format\n");
+		exit (EXIT_FAILURE);
 	}
 
 	/* write changes, unlock, and close */
@@ -72,10 +70,57 @@ int main (void) {
 	fl.l_type = F_UNLCK;
 	if (fcntl(fd, F_SETLK, &fl) == -1) {
 		perror("fcntl");
-		exit(1);
+		exit(EXIT_FAILURE);
 	}
 	fclose(fp);
 	
+	/* make page */
+	printf("Scores:\n");
+	for (i = 0; i < charcount; i++) {
+		printf("%20s: %u\n", charnames[i], charscores[i]);
+	}
+	
+	char *ipstr;
+	ipstr = getenv("REMOTE_ADDR");
+	printf ("\nIP: %s\n", ipstr);	
+	
 	return EXIT_SUCCESS;
+}
+
+int getnum (void) {
+	unsigned int val;
+	if (scanf ("%u.", &val) != 1) {
+		return -1;
+	} else {
+		return val;
+	}
+}
+
+int applyvote (FILE *voteinput, unsigned int scores[]) {
+	unsigned int i;
+	int num;
+	char arg[6];
+	scanf("%5s", arg);
+	if (strcmp(arg, "vote=") != 0) {
+		return -1;
+	}
+	unsigned int numhurts = getnum();
+	unsigned int numheals = getnum();
+	for (i = 0; i < numhurts; i++) {
+		if ((num = getnum()) == -1) {
+			return -1;
+		} else {
+			if(scores[num] > 0) {
+				scores[num]--;
+			}
+		}
+	}
+	for (i = 0; i < numheals; i++) {
+		if ((num = getnum()) == -1) {
+			return -1;
+		} else {
+			scores[num]++;
+		}
+	}
 }
 
