@@ -36,18 +36,36 @@ int main (void) {
 		}
 	}
 	fclose(fp);
-
+	
+	/* check if this is a returning ip */
+	bool canvote;
+	char *ipstr;
+	ipstr = getenv("REMOTE_ADDR");
+	fp = fopen ("recentvoters", "a+");
+	if (canvote = !checkip (fp, ipstr)) {	
+		addip (fp, ipstr);
+	}
+	fclose(fp);
+		
 	/* open, lock, and read scores */
 	struct flock fl = {F_WRLCK, SEEK_SET, 0, 0, getpid()};
-	if ((fd = open("scores", O_RDWR)) == -1) {
-		perror("open");
-		exit(1);
-	}
-	if (fcntl(fd, F_SETLKW, &fl) == -1) {
-		perror("fcntl");
-		exit(1);
-	}
-	fp = fdopen(fd, "r+");
+	if (canvote) {
+		if ((fd = open("scores", O_RDWR)) == -1) {
+			perror("open read/write");
+			exit(1);
+		}
+		if (fcntl(fd, F_SETLKW, &fl) == -1) {
+			perror("fcntl");
+			exit(1);
+		}
+		fp = fdopen(fd, "r+");
+	} else {
+		if ((fd = open("scores", O_RDONLY)) == -1) {
+			perror("open read-only");
+			exit(1);
+		}
+		fp = fdopen(fd, "r");
+	}	
 	unsigned int charscores[charcount];
 	for (i = 0; i < charcount; i++) {
 		if (fscanf (fp, "%u\n", &(charscores[i])) != 1) {
@@ -56,22 +74,24 @@ int main (void) {
 		}
 	}
 
-	/* change scores */
-	if (applyvote(stdin, charscores) == -1) {
-		printf ("Unexpected vote format\n");
-		exit (EXIT_FAILURE);
-	}
+	if (canvote) {
+		/* change scores */
+		if (applyvote(stdin, charscores) == -1) {
+			printf ("Unexpected vote format\n");
+			exit (EXIT_FAILURE);
+		}
 
-	/* write changes, unlock, and close */
-	rewind (fp);
-	ftruncate (fd, 0);
-	for (i = 0; i < charcount; i++) {
-		fprintf (fp, "%u\n", charscores[i]);
-	}
-	fl.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &fl) == -1) {
-		perror("fcntl");
-		exit(EXIT_FAILURE);
+		/* write changes, unlock, and close */
+		rewind (fp);
+		ftruncate (fd, 0);
+		for (i = 0; i < charcount; i++) {
+			fprintf (fp, "%u\n", charscores[i]);
+		}
+		fl.l_type = F_UNLCK;
+		if (fcntl(fd, F_SETLK, &fl) == -1) {
+			perror("fcntl");
+			exit(EXIT_FAILURE);
+		}
 	}
 	fclose(fp);
 	
@@ -80,19 +100,12 @@ int main (void) {
 	for (i = 0; i < charcount; i++) {
 		printf("%20s: %u\n", charnames[i], charscores[i]);
 	}
-	
-	char *ipstr;
-	ipstr = getenv("REMOTE_ADDR");
-	printf ("\nIP: %s\n", ipstr);	
-	
-	fp = fopen ("recentvoters", "a+");
-	if (!checkip (fp, ipstr)) {	
-		addip (fp, ipstr);
-		printf ("This is your first time voting!\n");
+	printf ("\nIP: %s\n", ipstr);
+	if (canvote) {
+		printf ("You have not voted recently, so your vote has counted.\n");
 	} else {
-		printf ("You've already voted, but your vote has been recorded anyway.\n");
+		printf ("You have voted recently, so your vote has not counted.\n");
 	}
-	fclose(fp);
 	
 	return EXIT_SUCCESS;
 }
