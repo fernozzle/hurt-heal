@@ -3,7 +3,8 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <string.h>
-
+#include <stdbool.h>
+#include "ip.h"
 
 #define MAXNAMELEN 16
 
@@ -83,6 +84,15 @@ int main (void) {
 	char *ipstr;
 	ipstr = getenv("REMOTE_ADDR");
 	printf ("\nIP: %s\n", ipstr);	
+	
+	fp = fopen ("recentvoters", "a+");
+	if (!checkip (fp, ipstr)) {	
+		addip (fp, ipstr);
+		printf ("This is your first time voting!\n");
+	} else {
+		printf ("You've already voted, but your vote has been recorded anyway.\n");
+	}
+	fclose(fp);
 	
 	return EXIT_SUCCESS;
 }
