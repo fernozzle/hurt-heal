@@ -5,19 +5,26 @@
 #include <string.h>
 #include <stdbool.h>
 #include "ip.h"
+#include "rando.h"
 
 #define MAXNAMELEN 16
+#define CHARFILE "characters"
+#define SCOREFILE "scores"
+#define RECENTVOTERS "recentvoters"
+#define BLACKLIST "blacklist"
 
 int getnum (void);
 int applyvote (FILE *voteinput, unsigned int scores[]);
 
 int main (void) {
-	printf("Content-Type: text/plain;charset=us-ascii\n\n");
+	printf("Content-Type: text/plain;charset=us-ascii\n");
+	printf("Set-Cookie: GOOG=123; Path=/; HttpOnly\n");
+	printf("\n");
 	/* read character info */
 	int fd;
 	FILE *fp;
 
-	fp = fopen("characters", "r");
+	fp = fopen(CHARFILE, "r");
 	if (fp == NULL) {
 		perror ("Error opening character list");
 		exit (EXIT_FAILURE);
@@ -37,20 +44,32 @@ int main (void) {
 	}
 	fclose(fp);
 	
-	/* check if this is a returning ip */
-	bool canvote;
+	/* check if this ip is a returning ip */
+	bool canvote = true;
+	bool blacklisted;
+	bool recentlyvoted;	
 	char *ipstr;
 	ipstr = getenv("REMOTE_ADDR");
-	fp = fopen ("recentvoters", "a+");
-	if (canvote = !checkip (fp, ipstr)) {	
-		addip (fp, ipstr);
+	fp = fopen (BLACKLIST, "r");
+	blacklisted = checkip (fp, ipstr);
+	fclose (fp);
+	if (blacklisted) {
+		canvote = false;
+	} else {
+		fp = fopen (RECENTVOTERS, "a+");
+		recentlyvoted = checkip (fp, ipstr);
+		if (!recentlyvoted) {
+			addip (fp, ipstr);
+		} else {
+			canvote = false;
+		}
+		fclose (fp);
 	}
-	fclose(fp);
 		
 	/* open, lock, and read scores */
 	struct flock fl = {F_WRLCK, SEEK_SET, 0, 0, getpid()};
 	if (canvote) {
-		if ((fd = open("scores", O_RDWR)) == -1) {
+		if ((fd = open(SCOREFILE, O_RDWR)) == -1) {
 			perror("open read/write");
 			exit(1);
 		}
@@ -60,7 +79,7 @@ int main (void) {
 		}
 		fp = fdopen(fd, "r+");
 	} else {
-		if ((fd = open("scores", O_RDONLY)) == -1) {
+		if ((fd = open(SCOREFILE, O_RDONLY)) == -1) {
 			perror("open read-only");
 			exit(1);
 		}
@@ -102,10 +121,17 @@ int main (void) {
 	}
 	printf ("\nIP: %s\n", ipstr);
 	if (canvote) {
-		printf ("You have not voted recently, so your vote has counted.\n");
+		printf ("Your vote has been casted.\n");
 	} else {
-		printf ("You have voted recently, so your vote has not counted.\n");
+		if (recentlyvoted) {
+			printf ("You have voted recently, so your vote has not counted.\n");
+		} else if (blacklisted) {
+			printf ("Your IP address is on the blacklist.");
+		}
 	}
+	char rid[33];
+	randalphanum (rid, 32);
+	printf ("Random 32-character ID: %s\n", rid);
 	
 	return EXIT_SUCCESS;
 }

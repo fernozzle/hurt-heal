@@ -1,6 +1,6 @@
 all: hurt-heal.cgi
 
-hurt-heal.cgi: hurt-heal.o ip.o
+hurt-heal.cgi: hurt-heal.o ip.o rando.o
 	cc -o $@ $^
 
 hurt-heal.o: hurt-heal.c
