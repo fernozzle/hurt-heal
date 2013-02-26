@@ -5,7 +5,6 @@
 #include <string.h>
 #include <stdbool.h>
 #include "ip.h"
-#include "rando.h"
 
 #define MAXNAMELEN 16
 #define CHARFILE "characters"
@@ -17,8 +16,8 @@ int getnum (void);
 int applyvote (FILE *voteinput, unsigned int scores[]);
 
 int main (void) {
-	printf("Content-Type: text/plain;charset=us-ascii\n");
-	printf("Set-Cookie: GOOG=123; Path=/; HttpOnly\n");
+	
+	printf("Content-Type: text/plain;charset=utf-8\n");
 	printf("\n");
 	/* read character info */
 	int fd;
@@ -121,7 +120,7 @@ int main (void) {
 	}
 	printf ("\nIP: %s\n", ipstr);
 	if (canvote) {
-		printf ("Your vote has been casted.\n");
+		printf ("Your vote has been cast.\n");
 	} else {
 		if (recentlyvoted) {
 			printf ("You have voted recently, so your vote has not counted.\n");
@@ -129,9 +128,6 @@ int main (void) {
 			printf ("Your IP address is on the blacklist.");
 		}
 	}
-	char rid[33];
-	randalphanum (rid, 32);
-	printf ("Random 32-character ID: %s\n", rid);
 	
 	return EXIT_SUCCESS;
 }
