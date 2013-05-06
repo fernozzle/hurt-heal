@@ -5,10 +5,10 @@
 
 /* assumes file mode is a+ */
 
-int addip (FILE *listfile, char ipstr[]) {
+int addip (FILE *listfile, const char *ipstr) {
 	fprintf(listfile, "%s\n", ipstr);
 }
-bool checkip (FILE *listfile, char ipstr[]) {
+bool checkip (FILE *listfile, const char *ipstr) {
 	char currentipstr [MAX_IP_LEN];
 	rewind (listfile);
 	while (fscanf(listfile, "%s\n", currentipstr) == 1) {
