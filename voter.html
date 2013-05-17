@@ -14,6 +14,10 @@
 </form>
 -->
 
+<button id="score">Scores</button>
+<button id="char">Characters</button>
+<button id="hist">History</button>
+
 <div id="hurts">
 </div>
 
@@ -33,6 +37,31 @@
 <pre id="resultpre">Result will be displayed here</pre>
 
 <script>
+function s (scoresArray) {
+	console.log (scoresArray);
+	//alert ("Scores have been logged in the console.");
+}
+var c = s;
+var h = s;
+document.getElementById ("score").addEventListener ("click", function () {
+	var script = document.createElement('script');
+	script.src = "hurt-heal.cgi?s";
+	document.getElementsByTagName('head')[0].appendChild(script);
+}, false);
+
+document.getElementById ("char").addEventListener ("click", function () {
+	var script = document.createElement('script');
+	script.src = "hurt-heal.cgi?c";
+	document.getElementsByTagName('head')[0].appendChild(script);
+}, false);
+
+
+document.getElementById ("hist").addEventListener ("click", function () {
+	var script = document.createElement('script');
+	script.src = "hurt-heal.cgi?h";
+	document.getElementsByTagName('head')[0].appendChild(script);
+}, false);
+
 var hurtcount = 0, healcount = 0;
 var hurtfields = [], healfields = [];
 var hurtcont = document.getElementById ("hurts");

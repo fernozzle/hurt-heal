@@ -1,4 +1,3 @@
-#include <curl/curl.h>
 #include <stdbool.h>
 
 bool checkcaptcha (const char * const ipstr,

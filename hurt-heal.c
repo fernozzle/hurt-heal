@@ -4,6 +4,7 @@
 #include <fcntl.h>
 #include <string.h>
 #include <stdbool.h>
+#include <time.h>
 #include "parsevote.h"
 #include "ip.h"
 #include "captcha.h"
@@ -11,6 +12,7 @@
 #define MAXNAMELEN 16
 #define CHARFILE "characters"
 #define SCOREFILE "scores"
+#define HISTORYFILE "scorehistory"
 #define RECENTVOTERS "recentvoters"
 #define BLACKLIST "blacklist"
 
@@ -18,9 +20,38 @@
 #define QUALRECENTV 1 << 1
 #define QUALFAILCAP 1 << 2
 
-/*int getnum (void);
-int applyvote (FILE *voteinput, unsigned int scores[]);*/
+#define DATELEN 9
+
 int applyvote (votedata *vote, unsigned int scores[]);
+void printscores    (const char *filename);
+void printscorehistory (const char *filename);
+void printcharnames (const char *filename);
+unsigned int getcharcount (const char *filename) {
+	FILE *fp;
+	fp = fopen(filename, "r");
+	if (fp == NULL) {
+		perror ("Error opening character list");
+		exit (EXIT_FAILURE);
+	}
+	unsigned int charcount;
+	if (fscanf (fp, "%u\n", &charcount) != 1) {
+		printf ("Error reading character count from list\n");
+		exit (EXIT_FAILURE);
+	}
+	fclose (fp);
+	return charcount;
+}
+void datestring (char *ds) {
+	time_t currenttime;
+	struct tm *tmtime;
+	
+	currenttime = time (NULL);
+	tmtime = localtime (&currenttime);
+	if (strftime (ds, DATELEN, "%Y%m%d", tmtime) != 8) {
+		fprintf (stderr, "Error in making time string\n");
+		exit (EXIT_FAILURE);
+	}
+}
 
 ssize_t qualifications (const char *ipstr,
 			const votedata *invote,
@@ -48,166 +79,105 @@ ssize_t qualifications (const char *ipstr,
 
 int main (void) {
 	
-	printf("Content-Type: text/plain;charset=utf-8\n");
+	printf("Content-Type: application/javascript;charset=utf-8\n");
 	printf("\n");
-
-	/* read vote */
-	votedata *invote;
-	invote = malloc (sizeof(votedata));
-	if (parsevote(invote) == -1) {
-		printf ("Unexpected vote format\n");
-		exit (EXIT_FAILURE);
-	}
 	
-	/* read character info */
-	unsigned int charcount;
-	/*char charnames[charcount][MAXNAMELEN];*/
-	char **charnames;
-	int fd;
-	FILE *fp;
-
-	fp = fopen(CHARFILE, "r");
-	if (fp == NULL) {
-		perror ("Error opening character list");
-		exit (EXIT_FAILURE);
-	}
-	if (fscanf (fp, "%u\n", &charcount) != 1) {
-		printf ("Error reading character count\n");
-		exit (EXIT_FAILURE);
-	}
-	unsigned int i;
-	/*charnames = malloc (charcount * sizeof (char *));
-	unsigned int i;
-	for (i = 0; i < charcount; i++) {
-		if (fscanf (fp, "%m[^\n]\n", &charnames[i]) != 1) {
-			printf ("Error reading character name %d\n", i);
-			exit (EXIT_FAILURE);
-		}
-	}*/
-	fclose(fp);
-	
-	char *ipstr;
-	if ((ipstr = getenv("REMOTE_ADDR")) == NULL) {
+	char *methodstr;
+	if ((methodstr = getenv ("REQUEST_METHOD")) == NULL) {
 		fprintf (stderr, "Not CGI\n");
+		exit (EXIT_FAILURE);
 	}
-	unsigned int unable = 0;
-	qualifications (ipstr, invote, &unable);
-	
-	/* open, lock, and read scores */
-	struct flock fl;
-	if (!unable) {
-		if ((fd = open(SCOREFILE, O_RDWR)) == -1) {
-			perror("open read/write");
-			exit(1);
-		}
-		fl = (struct flock) {F_WRLCK, SEEK_SET, 0, 0, getpid()};
-		if (fcntl(fd, F_SETLKW, &fl) == -1) {
-			perror("fcntl");
-			exit(1);
-		}
-		fp = fdopen(fd, "r+");
-	} else {
-		if ((fd = open(SCOREFILE, O_RDONLY)) == -1) {
-			perror("open read-only");
-			exit(1);
-		}
-		fl = (struct flock) {F_RDLCK, SEEK_SET, 0, 0, getpid()};
-		if (fcntl(fd, F_SETLKW, &fl) == -1) {
-			perror("fcntl");
-			exit(1);
-		}
-		fp = fdopen(fd, "r");
-	}
-	unsigned int charscores[charcount];
-	for (i = 0; i < charcount; i++) {
-		if (fscanf (fp, "%u\n", &(charscores[i])) != 1) {
-			printf ("Error reading character score\n");
+		
+	if (methodstr[0] == 'P') {
+		/* read vote */
+		votedata *invote;
+		invote = malloc (sizeof(votedata));
+		if (parsevote(invote) == -1) {
+			printf ("Unexpected vote format\n");
 			exit (EXIT_FAILURE);
 		}
-	}
 	
-	if (!unable) {
-		/* change scores */
-		applyvote(invote, charscores);
+		/* read character info */
+		unsigned int charcount = getcharcount (CHARFILE);
+	
+		char *ipstr;
+		if ((ipstr = getenv("REMOTE_ADDR")) == NULL) {
+			fprintf (stderr, "Not CGI\n");
+		}
+		unsigned int unable = 0;
+		qualifications (ipstr, invote, &unable);
+	
+		/* open, lock, and read scores */
+		if (!unable) {
+			int fd;
+			if ((fd = open(SCOREFILE, O_RDWR)) == -1) {
+				perror("open read/write");
+				exit(1);
+			}
+			struct flock fl;
+			fl = (struct flock) {F_WRLCK, SEEK_SET, 0, 0, getpid()};
+			if (fcntl(fd, F_SETLKW, &fl) == -1) {
+				perror("fcntl");
+				exit(1);
+			}
+			FILE *fp;
+			fp = fdopen(fd, "r+");
+			fscanf (fp, "%*u\n"); /* ignore date */
+			
+			unsigned int charscores[charcount], i;
+			for (i = 0; i < charcount; i++) {
+				if (fscanf (fp, "%u\n", &(charscores[i])) != 1) {
+					printf ("Error reading character score\n");
+					exit (EXIT_FAILURE);
+				}
+			}
+			/* change scores */
+			applyvote(invote, charscores);
 		
-		/* write changes, unlock, and close */
-		rewind (fp);
-		ftruncate (fd, 0);
-		for (i = 0; i < charcount; i++) {
-			fprintf (fp, "%u\n", charscores[i]);
+			/* write changes, unlock, and close */
+			rewind (fp);
+			ftruncate (fd, 0);
+			char *ds;
+			ds = malloc (DATELEN * sizeof (char));
+			datestring (ds);
+			fprintf (fp, "%s\n", ds);
+			for (i = 0; i < charcount; i++) {
+				fprintf (fp, "%u\n", charscores[i]);
+			}
+			fl.l_type = F_UNLCK;
+			if (fcntl(fd, F_SETLK, &fl) == -1) {
+				perror("fcntl");
+				exit(EXIT_FAILURE);
+			}
+			fclose(fp);
 		}
-	}
-	fl.l_type = F_UNLCK;
-	if (fcntl(fd, F_SETLK, &fl) == -1) {
-		perror("fcntl");
-		exit(EXIT_FAILURE);
-	}
-	fclose(fp);
-	
-	/* make page */
-	/*if (canvote) {*/
-		printvote (invote);
-	/*}*/
-	printf("Scores:\n");
-	for (i = 0; i < charcount; i++) {
-		/*printf("%20s: %u\n", charnames[i], charscores[i]);*/
-		printf ("Character %2u: %u\n", i, charscores[i]);
-	}
-	printf ("\nIP address: %s\n", ipstr);
-	if (!unable) {
-		printf ("Your vote has been cast.\n");
+		
+		if (!unable) printf ("v(true,0)");
+		else         printf ("v(false,%d)", unable);
 	} else {
-		if (unable & QUALFAILCAP) {
-			printf ("You may have mistyped the ReCaptcha.\n");
-		}
-		if (unable & QUALRECENTV) {
-			printf ("You have voted recently, so your vote has not counted.\n");
-		}
-		if (unable & QUALBLKLIST) {
-			printf ("Your IP address is on the blacklist.");
-		}
-	}
-	
-	return EXIT_SUCCESS;
-}
-/*
-int getnum (void) {
-	unsigned int val;
-	if (scanf ("%u.", &val) != 1) {
-		return -1;
-	} else {
-		return val;
-	}
-}
-
-int applyvote (FILE *voteinput, unsigned int scores[]) {
-	unsigned int i;
-	int num;
-	char arg[6];
-	scanf("%5s", arg);
-	if (strcmp(arg, "vote=") != 0) {
-		return -1;
-	}
-	unsigned int numhurts = getnum();
-	unsigned int numheals = getnum();
-	for (i = 0; i < numhurts; i++) {
-		if ((num = getnum()) == -1) {
-			return -1;
+		char *query;
+		if ((query = getenv ("QUERY_STRING")) == NULL) {
+			printf ("HI!!! :) XD YOLO\n");
+			fprintf (stderr, "Error getting query string\n");
+			exit (EXIT_FAILURE);
 		} else {
-			if(scores[num] > 0) {
-				scores[num]--;
+			switch (query[0]) {
+				case 's':
+					printscores (SCOREFILE);
+					break;
+				case 'h':
+					printscorehistory (HISTORYFILE);
+					break;
+				case 'c':
+					printcharnames (CHARFILE);
+					break;
+				default:
+					;
 			}
 		}
 	}
-	for (i = 0; i < numheals; i++) {
-		if ((num = getnum()) == -1) {
-			return -1;
-		} else {
-			scores[num]++;
-		}
-	}
+	return EXIT_SUCCESS;
 }
-*/
 int applyvote (votedata *vote, unsigned int scores[]) {
 	unsigned int i, charindex;
 	for (i = 0; i < vote->numhurts; i++) {
@@ -218,4 +188,100 @@ int applyvote (votedata *vote, unsigned int scores[]) {
 		charindex = vote->heals[i];
 		if (true) scores[charindex]++;
 	}
+}
+int printset (FILE *fp, unsigned int charcount) {
+	char *ds;
+	ds = malloc (sizeof (char) * DATELEN);
+	if (fscanf (fp, "%s\n", ds) != 1) {
+		return -1;
+	}
+	printf ("{'d':'%s','s':[", ds);
+	
+	bool prev = false;
+	unsigned int score;
+	while (charcount-- && fscanf (fp, "%u\n", &score) == 1) {
+		if (prev) printf (", ");		
+		printf ("%u", score);
+		prev = true;;
+	}
+	printf ("]}");
+	char separator[6];
+	if (fscanf (fp, "%s\n", separator) == 1) {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+void printscores (const char *filename) {
+	int fd;
+	if ((fd = open (filename, O_RDONLY)) == -1) {
+		perror("opening score file");
+		exit (EXIT_FAILURE);
+	}
+	struct flock fl;
+	fl = (struct flock) {F_RDLCK, SEEK_SET, 0, 0, getpid()};
+	if (fcntl(fd, F_SETLKW, &fl) == -1) {
+		perror("fcntl");
+		exit(1);
+	}
+	FILE *fp;
+	fp = fdopen (fd, "r");
+	
+	printf ("s(");
+	unsigned int charcount = getcharcount (CHARFILE);
+	printset (fp, charcount);
+	fclose (fp);
+	printf (");");
+}
+void printscorehistory (const char *filename) {
+	int fd;
+	if ((fd = open (filename, O_RDONLY)) == -1) {
+		perror("opening score file");
+		exit (EXIT_FAILURE);
+	}
+	struct flock fl;
+	fl = (struct flock) {F_RDLCK, SEEK_SET, 0, 0, getpid()};
+	if (fcntl(fd, F_SETLKW, &fl) == -1) {
+		perror("fcntl");
+		exit(1);
+	}
+	FILE *fp;
+	fp = fdopen (fd, "r");
+	
+	unsigned int charcount = getcharcount (CHARFILE);
+	
+	printf ("h([");
+	while (printset (fp, charcount) == 1) {
+		printf (", ");
+	}
+	fclose (fp);
+	printf ("]);");
+}
+void printcharnames (const char *filename) {
+	FILE *fp;
+	if ((fp = fopen (filename, "r")) == NULL) {
+		perror ("opening character info file");
+		exit (EXIT_FAILURE);
+	}
+	
+	printf ("c([");
+	char c;
+	bool start = false;
+	fscanf (fp, "%*d\n");
+	printf ("'");
+	while ((c = fgetc (fp)) != EOF) {
+		if (c == '\n') {
+			start = true;
+		} else {
+			if (start) {
+				printf ("','");
+			}
+			putc (c, stdout);
+			start = false;
+		}
+	}
+	printf ("'");
+	fclose (fp);
+	
+	printf ("]);");
 }
