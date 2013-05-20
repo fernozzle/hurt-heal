@@ -34,9 +34,6 @@ int main (void) {
 	return EXIT_SUCCESS;
 }
 */
-int verifyvote (votedata *v) {
-	return 0;
-}
 
 int parsevote (votedata *in) {
 	/* vote format: v=[numhurts].[numheals].[hurt].[heal].[challenge].[solution]_ */
@@ -53,17 +50,11 @@ int parsevote (votedata *in) {
 	for (i = 0; i < in->numhurts; i++) {
 		if ((in->hurts [i] = getnum()) == -1) return -1;
 	}
-	
+
 	in->heals = malloc (in->numheals * sizeof (unsigned int));
 	for (i = 0; i < in->numheals; i++) {
 		if ((in->heals [i] = getnum()) == -1) return -1;
 	}
-	
-	in->challenge = malloc (CHALLEN * sizeof (char));
-	if (scanf ("%[^.].", in->challenge) != 1) return -1;
-	
-	in->solution = malloc (SOLULEN * sizeof (char));
-	if (scanf ("%[^_]", in->solution) != 1) return -1;
 	
 	return 0;
 }
@@ -78,8 +69,6 @@ void printvote (votedata *in) {
 	printf ("  hurts: ");
 	for (i = 0; i < in->numheals; i++) printf ("%i ", in->heals[i]);
 	printf ("\n");
-	printf ("challenge: %s\n", in->challenge);
-	printf ("solution:  %s\n", in->solution);
 }
 
 int getnum (void) {

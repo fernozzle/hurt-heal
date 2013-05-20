@@ -28,10 +28,6 @@
 
 <div><button id="addheal">Add heal</button></div>
 
-<img id="chalimg" />
-<div><input id="challenge" /></div>
-<div><input id="solution" /></div>
-
 <button id="submitbutton">Submit vote</button>
 
 <pre id="resultpre">Result will be displayed here</pre>
@@ -67,16 +63,6 @@ var hurtfields = [], healfields = [];
 var hurtcont = document.getElementById ("hurts");
 var healcont = document.getElementById ("heals");
 
-document.write = function (text) {};
-var script = document.createElement('script');
-script.onload = function() {
-	var imgSrc = "http://www.google.com/recaptcha/api/image?c=" + RecaptchaState ["challenge"];
-	document.getElementById ("chalimg").src = imgSrc;
-	document.getElementById ("challenge").value = RecaptchaState ["challenge"];
-};
-script.src = "http://www.google.com/recaptcha/api/challenge?k=6LfnpMwSAAAAAHtjh-GmvaHUQNexX6CaqWPId8Ks";
-document.getElementsByTagName('head')[0].appendChild(script);
-
 document.getElementById ("addhurt").onclick = function () {
 	var test = document.createElement ("input");
 	hurtfields.push (test);
@@ -97,9 +83,6 @@ document.getElementById ("submitbutton").onclick = function () {
 	for (var i = 0; i < healfields.length; i++) {
 		votestring += healfields[i].value + ".";
 	}
-	
-	votestring += document.getElementById ("challenge").value + ".";
-	votestring += document.getElementById ("solution").value + "_";
 
 	var x = new XMLHttpRequest();
 	x.open ("POST", "hurt-heal.cgi", false);

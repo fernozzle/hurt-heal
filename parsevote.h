@@ -3,8 +3,6 @@ typedef struct {
 	unsigned int  numheals;
 	unsigned int *hurts;
 	unsigned int *heals;
-	char         *challenge;
-	char         *solution;
 } votedata;
 
 int parsevote (votedata *in);
