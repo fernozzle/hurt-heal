@@ -7,7 +7,6 @@
 #include <time.h>
 #include "parsevote.h"
 #include "ip.h"
-#include "captcha.h"
 
 #define MAXNAMELEN 16
 #define CHARFILE "characters"
@@ -18,7 +17,6 @@
 
 #define QUALBLKLIST 1 << 0
 #define QUALRECENTV 1 << 1
-#define QUALFAILCAP 1 << 2
 
 #define DATELEN 9
 
@@ -71,10 +69,6 @@ ssize_t qualifications (const char *ipstr,
 	if (checkip (fp, ipstr)) *unable |= QUALRECENTV;
 	else addip (fp, ipstr);
 	fclose (fp);
-	/* check the captcha */
-	if (!checkcaptcha (ipstr, invote->challenge, invote->solution)) {
-		*unable |= QUALFAILCAP;
-	}
 }
 
 int main (void) {
