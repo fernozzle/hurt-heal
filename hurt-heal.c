@@ -44,11 +44,12 @@ void datestring (char *ds) {
 	struct tm *tmtime;
 	
 	currenttime = time (NULL);
-	tmtime = localtime (&currenttime);
-	if (strftime (ds, DATELEN, "%Y%m%d", tmtime) != 8) {
-		fprintf (stderr, "Error in making time string\n");
-		exit (EXIT_FAILURE);
-	}
+	tmtime = gmtime (&currenttime);
+	sprintf (ds, "%.4u%.2u%.2u%.1u",
+		tmtime->tm_year+1900,
+		tmtime->tm_mon+1,
+		tmtime->tm_mday,
+		tmtime->tm_hour / 6);
 }
 
 ssize_t qualifications (const char *ipstr,
@@ -132,7 +133,7 @@ int main (void) {
 			rewind (fp);
 			ftruncate (fd, 0);
 			char *ds;
-			ds = malloc (DATELEN * sizeof (char));
+			ds = malloc ((DATELEN + 1) * sizeof (char));
 			datestring (ds);
 			fprintf (fp, "%s\n", ds);
 			for (i = 0; i < charcount; i++) {
@@ -185,7 +186,7 @@ int applyvote (votedata *vote, unsigned int scores[]) {
 }
 int printset (FILE *fp, unsigned int charcount) {
 	char *ds;
-	ds = malloc (sizeof (char) * DATELEN);
+	ds = malloc (sizeof (char) * (DATELEN + 1));
 	if (fscanf (fp, "%s\n", ds) != 1) {
 		return -1;
 	}
